@@ -50,6 +50,10 @@ def parse_options
 			puts opts
 			exit 0
 		end
+
+		def opts.ver
+			CPanelBackup::Version.string
+		end
 	end
 
 	optparse.parse!
