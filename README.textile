@@ -32,3 +32,4 @@ The script should be run as following:
 bc. cpb_runner --action restore --users theusername  --home-rsync --delete-source --smart-id
 
 This will ask cpb to move _theusername.tar_ file from _/backups/cpanelbackup/backups/cpanelbackup/accounts/_ to _/backups/cpanelbackup/accounts/_ dir, restore from it, rsync home dir from _/backups/cpanelbackup/home/theusername/_ to _/home/theusername/_ and delete all backup data for that user afterwards in case of success.
+
