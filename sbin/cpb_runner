@@ -57,7 +57,8 @@ end
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 def init_logger
-	File.unlink(@options[:log_file_path]) rescue SystemCallError # remove
+	#File.unlink(@options[:log_file_path]) rescue SystemCallError # remove
+
 	@log          = Logger.new(@options[:log_file_path], 2, 10.megabytes)
 	@log.progname = 'cpbck'
 	@log.level    = Logger::DEBUG
