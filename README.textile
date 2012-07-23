@@ -1,0 +1,34 @@
+
+CPanelBackup helps you generate and restore CPanel backups. It was initially written as Bacula pre-job-run hook, but was quickly expanded to do more.
+
+h2. Usage
+
+Use the CLI script provided, run @cpb_runner --help@ to see all the options.
+
+Now let's go through the backup process.
+
+h3. Backing up stuff
+
+* Bacula runs a job.
+** Bacula invokes pre-run hook on the client
+** Bacula backups _/home_ & _/backups/cpanelbackup/accounts_ dirs
+
+The hook is invoked with the following options:
+
+bc. cpb_runner --action backup
+
+The script now backups *all* cpanel accounts into _/backups/cpanelbackup/accounts_ dir, where CPanel *pkgacct* 's *.tar files are placed.
+
+h3. Restoring
+
+* Something initiates backup restoral
+** Backups are restored into:
+*** CPanel backups: _/backups/cpanelbackup/backups/cpanelbackup/accounts_
+*** Home dir backups: _/backups/cpanelbackup/home_
+** User runs @cpb@ script
+
+The script should be run as following:
+
+bc. cpb_runner --action restore --users theusername  --home-rsync --delete-source
+
+This will ask cpb to move _theusername.tar_ file from _/backups/cpanelbackup/backups/cpanelbackup/accounts/_ to _/backups/cpanelbackup/accounts/_ dir, restore from it, rsync home dir from _/backups/cpanelbackup/home/theusername/_ to _/home/theusername/_ and delete all backup data for that user afterwards in case of success.

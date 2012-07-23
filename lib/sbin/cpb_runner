@@ -1,0 +1,129 @@
+#!/bin/env ruby
+
+require 'rubygems'
+require 'bundler/setup'
+
+require 'active_support/core_ext/numeric/bytes'
+
+require 'optparse'
+require 'logger'
+require 'fileutils'
+require 'pp'
+
+require 'cpanelbackup'
+require 'cpanelhelper'
+
+@options = {
+		:backup_dir    => '/backups/cpanelbackup/accounts',
+		:restore_top_dir => '/backups/cpanelbackup',
+		:log_file_path => ENV['LOGFILE'] || '/var/log/cp-backup-runner.log',
+		:action        => 'backup',
+		:reconstruct_ip => true,
+}
+
+# -----------------------------------------------------------------------------
+def parse_options
+	optparse = OptionParser.new do |opts|
+		opts.banner = "Usage: #{opts.program_name} [options]"
+
+		opts.on("--action STRING", "One of: BACKUP (default), RESTORE.") do |v|
+			@options[:action] = v.downcase
+		end
+
+		opts.on("--users STRING", "Comma separated list of users to operate on") do |v|
+			@options[:users] = v.strip.split(/[,\s\t]+/)
+		end
+
+		opts.on("--home-rsync [FROM]", "Whether to rsync homedir from topdir FROM/") do |v|
+			@options[:home_rsync] = v || File.join(@options[:restore_top_dir], 'home')
+		end
+
+		opts.on("--delete-source", "Delete source files after successful transfer") do
+			@options[:rm_source] = true
+		end
+
+		opts.on("--help") do
+			puts opts
+			exit 0
+		end
+	end
+
+	optparse.parse!
+end
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+def init_logger
+	File.unlink(@options[:log_file_path]) rescue SystemCallError # remove
+	@log          = Logger.new(@options[:log_file_path], 2, 10.megabytes)
+	@log.progname = 'cpbck'
+	@log.level    = Logger::DEBUG
+end
+
+def init_cpanel_helper
+	CPanelHelper.configure do |config|
+		config.logger = @log
+	end
+end
+
+# -----------------------------------------------------------------------------
+def back_em_up(cpbackup)
+	backups =
+		begin
+			cpbackup.backup
+		rescue CPanelBackup::BackupError => exc
+			@log.error "Error while backing up: #{exc.message}. Trying to pick up what's been already done."
+			exc.processed
+		end
+
+	if backups and not backups.empty?
+		@log.debug "The following backup files were created: #{backups.join(', ')}."
+	else
+		@log.debug "No backups done."
+		exit(2)
+	end
+
+	backups
+end
+
+def restore_em(cpbackup)
+	# First, try to move tar files from #{:restore_top_dir}/#{:backup_dir} to :backup_dir
+	backup_dir = @options[:backup_dir]
+	restore_backup_dir = File.join(@options[:restore_top_dir], backup_dir)
+
+	begin
+		FileUtils.mv(Dir.glob("#{restore_backup_dir}/*.tar"), backup_dir, :secure => true)
+		FileUtils.rm_rf(restore_backup_dir, :secure => true)
+	rescue SystemCallError => exc
+		logger.info "[restore] Expected to find tars in #{restore_backup_dir}, but none found or dir doesn't exist. Maybe they reside in #{backup_dir}? Proceeding..."
+	end
+
+	if Dir.glob("#{backup_dir}/*.tar").entries.empty?
+		raise(CPanelBackup::RestoreError, 'Nothing to restore')
+	end
+
+	restore_opts = {
+			:reconstruct_ip            => @options[:reconstruct_ip],
+			:cpanel_dbflush_workaround => true,
+			:rsync_homedir             => @options[:home_rsync],
+			:rm_source                 => @options[:rm_source]
+	}
+	cpbackup.restore(restore_opts)
+end
+
+# -----------------------------------------------------------------------------
+# Main flow
+init_logger
+parse_options
+init_cpanel_helper
+
+cpbackup = CPanelBackup.new(@options.update(:logger => @log))
+
+case @options[:action]
+	when 'backup'
+		back_em_up(cpbackup)
+	when 'restore'
+		restore_em(cpbackup)
+	else
+		@log.error "Specify step to execute."
+		exit(1)
+end
