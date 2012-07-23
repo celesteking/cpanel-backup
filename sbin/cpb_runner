@@ -1,7 +1,7 @@
 #!/bin/env ruby
 
 require 'rubygems'
-require 'bundler/setup'
+#require 'bundler/setup'
 
 require 'active_support/core_ext/numeric/bytes'
 
@@ -137,3 +137,5 @@ case @options[:action]
 		@log.error "Specify step to execute."
 		exit(1)
 end
+
+exit(0)
