@@ -10,7 +10,7 @@ Now let's go through the backup process.
 h3. Backing up stuff
 
 * Bacula runs a job.
-** Bacula invokes pre-run hook on the client
+** Bacula invokes pre-run hook on the client (@cpb_runner@)
 ** Bacula backups _/home_ & _/backups/cpanelbackup/accounts_ dirs
 
 The hook is invoked with the following options:
@@ -22,13 +22,13 @@ The script now backups *all* cpanel accounts into _/backups/cpanelbackup/account
 h3. Restoring
 
 * Something initiates backup restoral
-** Backups are restored into:
-*** CPanel backups: _/backups/cpanelbackup/backups/cpanelbackup/accounts_
-*** Home dir backups: _/backups/cpanelbackup/home_
-** User runs @cpb@ script
+** Backup files are placed into:
+*** CPanel backups (tar): _/backups/cpanelbackup/backups/cpanelbackup/accounts_
+*** Home dir backups (plain): _/backups/cpanelbackup/home_
+** User runs @cpb_runner@ script
 
 The script should be run as following:
 
-bc. cpb_runner --action restore --users theusername  --home-rsync --delete-source
+bc. cpb_runner --action restore --users theusername  --home-rsync --delete-source --smart-id
 
 This will ask cpb to move _theusername.tar_ file from _/backups/cpanelbackup/backups/cpanelbackup/accounts/_ to _/backups/cpanelbackup/accounts/_ dir, restore from it, rsync home dir from _/backups/cpanelbackup/home/theusername/_ to _/home/theusername/_ and delete all backup data for that user afterwards in case of success.

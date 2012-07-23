@@ -42,6 +42,10 @@ def parse_options
 			@options[:rm_source] = true
 		end
 
+		opts.on("--smart-id", "Use smart ID feature, where we set ownership properly on rsync'ed homedir") do
+			@options[:smart_id] = true
+		end
+
 		opts.on("--help") do
 			puts opts
 			exit 0
@@ -105,7 +109,8 @@ def restore_em(cpbackup)
 			:reconstruct_ip            => @options[:reconstruct_ip],
 			:cpanel_dbflush_workaround => true,
 			:rsync_homedir             => @options[:home_rsync],
-			:rm_source                 => @options[:rm_source]
+			:rm_source                 => @options[:rm_source],
+			:smart_id                  => @options[:smart_id],
 	}
 	cpbackup.restore(restore_opts)
 end

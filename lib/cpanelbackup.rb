@@ -4,6 +4,7 @@ require 'cpanelbackup/version'
 require 'active_support/core_ext/module/attribute_accessors'
 require 'active_support/core_ext/hash/reverse_merge'
 require 'fileutils'
+require 'etc'
 
 require 'cpanelhelper'
 
@@ -185,6 +186,10 @@ class CPanelBackup
 			rescue BackupError => exc
 				raise(UserRestoreError, "Failure rsyncing content for #{user}: #{exc.message}")
 			end
+
+			if opts[:smart_id]
+				fixup_homedir_ownership(user)
+			end
 		end
 
 		if opts[:rm_source]
@@ -214,7 +219,7 @@ class CPanelBackup
 		opts = opts.extract_options!
 		raise ArgumentError if src =~ %r{^[/\.]+$} or dst =~ %r{^[/\.]+$}
 
-		logger.debug "{rsync} Sync'ing #{src} -> #{dst}"
+		logger.debug "{rsync} Sync'ing #{src} -> #{dst} #{'with source deletion afterwards' if opts[:rm_source]}"
 		output = %x{rsync -rlAXtgo #{'--remove-source-files' if opts[:rm_source]} #{src} #{dst}}
 		log_lines(output, 'rsync') unless output.strip.empty?
 
@@ -292,6 +297,36 @@ class CPanelBackup
 			wait_time += acc
 			acc * Math.log(6)
 		end
+	end
+
+	# Set proper ownership to /home/$user after rsync'ing
+	def fixup_homedir_ownership(user)
+		# Determine whether current ownership is right
+		homedir_stat = File.stat("/home/#{user}/")
+
+		uid_correct =
+				begin
+					Etc.getpwuid(homedir_stat.uid).name == user
+				rescue ArgumentError
+					false
+				end
+		gid_correct =
+				begin
+					Etc.getgrgid(homedir_stat.gid).name == user
+				rescue ArgumentError
+					false
+				end
+
+		logger.debug "[CPB:restore] Attemping homedir permission fix." unless uid_correct and gid_correct
+
+		unless uid_correct
+			invoke_and_log_cmd("/usr/bin/find -P /home/#{user}/ -user #{homedir_stat.uid} -exec /bin/chown -P --no-dereference #{user} '{}' \\;", 'chown')
+		end
+
+		unless gid_correct
+			invoke_and_log_cmd("/usr/bin/find -P /home/#{user}/ -group #{homedir_stat.gid} -exec /bin/chgrp -P --no-dereference #{user} '{}' \\;", 'chgrp')
+		end
+
 	end
 
 	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
