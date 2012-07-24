@@ -42,8 +42,12 @@ def parse_options
 			@options[:rm_source] = true
 		end
 
-		opts.on("--smart-id", "Use smart ID feature, where we set ownership properly on rsync'ed homedir") do
+		opts.on("--smart-id", "Use smart ID feature, where we set ownership properly on rsync'ed homedir after restoral") do
 			@options[:smart_id] = true
+		end
+
+		opts.on("--process-sql-grants", "Add SQL grants to final tar archive when backing up and exec SQL grants from it when restoring") do
+			@options[:process_sql_grants] = true
 		end
 
 		opts.on("--help") do
@@ -78,14 +82,14 @@ end
 def back_em_up(cpbackup)
 	backups =
 		begin
-			cpbackup.backup
+			cpbackup.backup(:append_sql_grants => @options[:process_sql_grants])
 		rescue CPanelBackup::BackupError => exc
 			@log.error "Error while backing up: #{exc.message}. Trying to pick up what's been already done."
 			exc.processed
 		end
 
 	if backups and not backups.empty?
-		@log.debug "The following backup files were created: #{backups.join(', ')}."
+		@log.debug "The following backup files were created in #{@options[:backup_dir]}: #{backups.join(', ')}."
 	else
 		@log.debug "No backups done."
 		exit(2)
@@ -99,11 +103,13 @@ def restore_em(cpbackup)
 	backup_dir = @options[:backup_dir]
 	restore_backup_dir = File.join(@options[:restore_top_dir], backup_dir)
 
+	cpbackup.check_dir_access(backup_dir, true) # we'll be moving tars to this dir
+
 	begin
 		FileUtils.mv(Dir.glob("#{restore_backup_dir}/*.tar"), backup_dir, :secure => true)
 		FileUtils.rm_rf(restore_backup_dir, :secure => true)
 	rescue SystemCallError => exc
-		logger.info "[restore] Expected to find tars in #{restore_backup_dir}, but none found or dir doesn't exist. Maybe they reside in #{backup_dir}? Proceeding..."
+		@log.info "[restore] Expected to find tars in #{restore_backup_dir}, but none found or dir doesn't exist. Maybe they reside in #{backup_dir}? Proceeding..."
 	end
 
 	if Dir.glob("#{backup_dir}/*.tar").entries.empty?
@@ -116,6 +122,7 @@ def restore_em(cpbackup)
 			:rsync_homedir             => @options[:home_rsync],
 			:rm_source                 => @options[:rm_source],
 			:smart_id                  => @options[:smart_id],
+			:exec_sql_grants           => @options[:process_sql_grants],
 	}
 	cpbackup.restore(restore_opts)
 end

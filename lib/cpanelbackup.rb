@@ -23,9 +23,7 @@ class CPanelBackup
 	# @param [Hash] opts
 	# @option opts [String] logger
 	# @option opts [String] backup_dir
-	def initialize(*opts)
-		opts = opts.extract_options!
-
+	def initialize(opts)
 		# Set ivars
 		@logger = opts[:logger] || Logger.new($stderr)
 		@backup_dir = opts[:backup_dir] || '/backups/cpanelbackup/accounts'
@@ -47,7 +45,8 @@ class CPanelBackup
 	# @param [Hash] opts
 	# @option opts [Array] :exclude
 	# @option opts [Array] :include
-	def backup(*opts)
+	# @option opts [Boolean] :append_sql_grants Incorporate mysql acess privs in mysql.sql file that goes into final tar
+	def backup(opts = {})
 		check_dir_access(backup_dir, true)
 
 		cpanel_accounts = get_cpanel_account_list
@@ -74,17 +73,16 @@ class CPanelBackup
 			begin
 				raise(BackupError.new.processed(backups), "Number of backup failures reached.") if backup_failures >= @backup_failures_limit
 
-				backups << backup_account(user)
+				backups << backup_account(user, opts)
 
 			rescue UserBackupError => exc
 				logger.error "[CPanelBackup] #{exc.message}. Trying next user."
 				backup_failures += 1
 				next
 			end
-
-			backups
 		end
 
+		backups
 	rescue CPanelHelper::Error => exc
 		logger.error "Error occured while interacting with CPanelHelper: <#{exc.class}: #{exc.message}>"
 		raise BackupError, exc
@@ -92,19 +90,18 @@ class CPanelBackup
 
 	# Restore CPanel accounts from backup.
 	# @param [Hash] opts
-	# @option opts [Boolean,String] :reconstruct_ip {nil}
+	# @option opts [Boolean,String] :reconstruct_ip (nil)
 	#              [TrueClass]: Whether to retrieve IP from the archive and use it in acc restoral,
 	#              [String]: Use specified IP when restoring account
-	# @option opts [Boolean]    :kill {true} Kill account before restoral
-	# @option opts [String]     :backup_file {} Backup file path
-	# @option opts [Boolean]    :trick_homedir {false} Tar homedir files from _@backup_dir/home/user/_ into _@backup_dir/user/homedir.tar_, then append to :backup_file
-	# @option opts [Boolean]    :trick_homedir_rm {false} Delete homedir files after _tricking_
-	# @option opts [String]     :rsync_homedir {false} Rsync homedir files from this path to user's account
-	# @option opts [Boolean]    :cpanel_dbflush_workaround {false} Work around CPanel poo in *users.db*
+	# @option opts [Boolean]    :kill (true) Kill account before restoral
+	# @option opts [String]     :backup_file (see code) Backup file path
+	# @option opts [Boolean]    :trick_homedir (false) Tar homedir files from _@backup_dir/home/user/_ into _@backup_dir/user/homedir.tar_, then append to :backup_file
+	# @option opts [Boolean]    :trick_homedir_rm (false) Delete homedir files after _tricking_
+	# @option opts [String]     :rsync_homedir (false) Rsync homedir files from this path to user's account
+	# @option opts [Boolean]    :cpanel_dbflush_workaround (false) Work around CPanel poo in *users.db*
+	# @option opts [Boolean]    :exec_sql_grants (false) Execute mysql grant permissions from mysql.sql file in tar archive
 	# @return [Array<String>] list of restored usernames
-	def restore(*opts)
-		opts = opts.extract_options!
-
+	def restore(opts = {})
 		check_dir_access(backup_dir, false)
 
 		raise(ArgumentError, 'User list is empty') if users.empty?
@@ -123,27 +120,50 @@ class CPanelBackup
 	end
 
 	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 	# Back up user account
 	# @param [String] user
+	# @param [Hash] opts
 	# @return [String] backup file path
-	def backup_account(user)
+	# @see #backup for accepted options
+	def backup_account(user, opts = {})
+		tar_file = File.join(backup_dir, "#{user}.tar")
 
 		invoke_and_log_cmd("#{@pkgacct_exe} --backup  --skiphomedir --skipacctdb --nocompress #{user} #{backup_dir}", 'pkgacct')
 		raise(UserBackupError, "Failure while backing up #{user}") unless $?.success?
 
-		File.join(backup_dir, "#{user}.tar.gz")
+		if opts[:append_sql_grants]
+			sql_data = cpanel_dump_sql_data(Etc.getpwnam(user).uid)
+			grant_text = sql_data['dumpsql']
+
+			temp_user_dir = File.join(backup_dir, user)
+			FileUtils.mkdir_p(temp_user_dir, :mode => 0700)
+
+			temp_mysql_file = "#{temp_user_dir}/mysql.sql"
+
+			File.open(temp_mysql_file, 'w', 0600) do |mfh|
+				mfh.puts '-- cPanel mysql backup'
+				mfh.puts grant_text
+			end
+
+			integrate_into_tar(tar_file, "#{user}/mysql.sql", backup_dir)
+
+			FileUtils.rm_rf(temp_user_dir)
+		end
+
+		"#{user}.tar"
 	end
 
 	# Restore user account
-	# @see [restore]
-	def restore_account(user, *opts)
+	# @see #restore for accepted options
+	def restore_account(user, opts)
 		default_opts = {
 				:backup_file => File.join(@backup_dir, "#{user}.tar"),
 				:kill => true,
 				:reconstruct_ip => true,
 				:trick_homedir => false,
 		}
-		(opts = opts.extract_options!).reverse_merge!(default_opts)
+		opts.reverse_merge!(default_opts)
 
 		if opts[:trick_homedir]
 			raise NotImplementedError
@@ -180,6 +200,12 @@ class CPanelBackup
 			end
 		end
 
+		if opts[:exec_sql_grants]
+			# Feed mysql.sql grant file from tar archive directly to mysql cli
+			feed_cmd = "tar --to-stdout -x -f  #{opts[:backup_file]} #{user}/mysql.sql | mysql -B -f"
+			invoke_and_log_cmd(feed_cmd, 'sql_grant_exec')
+		end
+
 		if opts[:rsync_homedir]
 			begin
 				rsync_files("#{opts[:rsync_homedir]}/#{user}/", "/home/#{user}/", :rm_source => opts[:rm_source])
@@ -213,10 +239,9 @@ class CPanelBackup
 	# @param [String] src
 	# @param [String] dst
 	# @param [Hash] opts
-	# @option opts [Bool] :rm_source Remove source after successful transfer
+	# @option opts [Boolean] :rm_source Remove source after successful transfer
 	# @raise [BackupError] on error
-	def rsync_files(src, dst, *opts)
-		opts = opts.extract_options!
+	def rsync_files(src, dst, opts = {})
 		raise ArgumentError if src =~ %r{^[/\.]+$} or dst =~ %r{^[/\.]+$}
 
 		logger.debug "{rsync} Sync'ing #{src} -> #{dst} #{'with source deletion afterwards' if opts[:rm_source]}"
@@ -299,6 +324,21 @@ class CPanelBackup
 		end
 	end
 
+	# Dump mysql backup via cpanel tool
+	# @param [Fixnum] uid
+	# @return [Hash] {'alive', 'listdbs', 'lastupdatetimes', 'dumpsql'}
+	def cpanel_dump_sql_data(uid)
+		dump_data = {}
+		cb_dump = %x{/usr/local/cpanel/bin/cpmysqladmin #{uid} BACKUP}
+		cb_dump.scan(/-- cPanel BEGIN (.+?)\n(.+?)-- cPanel END/m).each do |name, data|
+			dump_data[name.downcase] = data.strip
+		end
+
+		raise(UserBackupError, "No backup data retrieved from cpmysqladmin tool: #{cb_dump}") if dump_data.empty?
+
+		dump_data
+	end
+
 	# Set proper ownership to /home/$user after rsync'ing
 	def fixup_homedir_ownership(user)
 		# Determine whether current ownership is right
@@ -330,6 +370,10 @@ class CPanelBackup
 	end
 
 	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+	def integrate_into_tar(tar_file, add_file, chdir = nil)
+		invoke_and_log_cmd("tar --append #{'-C ' + chdir if chdir} -pf #{tar_file} #{add_file}", 'tar_integrate')
+	end
+
 	def invoke_and_log_cmd(cmd, prefix = nil, &block)
 		logger.debug "{#{prefix}}  -- START: #{cmd} --"
 		output = %x{#{cmd}}

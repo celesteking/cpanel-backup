@@ -27,7 +27,7 @@ h3. Restoring
 *** Home dir backups (plain): _/backups/cpanelbackup/home_
 ** User runs @cpb_runner@ script
 
-The script should be run as following:
+The script could be run as following:
 
 bc. cpb_runner --action restore --users theusername  --home-rsync --delete-source --smart-id
 
@@ -35,4 +35,17 @@ This will ask @cpb@ to move _theusername.tar_ file from _/backups/cpanelbackup/b
 
 h2. Notes
 
+h3. Logging
+
 Log file is written into _/var/log/cp-backup-runner.log_ by default.
+
+h3. Options
+
+- --smart-id := Sets proper ownership on files below user homedir after rsync, but only in case _public_html_ has incorrect uid/gid. TODO: check how ACLs would behave.
+- --process-sql-grants := Stores mysql user access information (AKA grant data) into mysql.sql file and incorporates it into final tar archive. It mimics what _pkgacct_ would've done, but skips dumping table data. Same applies during restoral - it tries to exec mysql statements from that file if it's present.
+
+h3. Misc
+
+CPanel is a big nasty miserable mess in regards to general architecture and software design. It appears like tons of monkeys from different zoos were lured into one big purple cave where they were given a task of "getting API and CLI tools done immediately" without much thinking. [1] This could probably be the reason for all the workarounds we have to implement here.
+
+fn1. "Author's":https://github.com/celesteking personal opinion
