@@ -293,7 +293,7 @@ class CPanelBackup
 
 	def check_cpanel_tools_presence
 		unless [@pkgacct_exe, @restoreacct_exe, @killacct_exe].all? {|exe| File.executable?(exe)}
-			raise(BackupError, "CPanel tools unaccessible")
+			raise(BackupError, "CPanel tools inaccessible")
 		end
 	end
 

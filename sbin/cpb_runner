@@ -14,11 +14,11 @@ require 'cpanelbackup'
 require 'cpanelhelper'
 
 @options = {
-		:backup_dir    => '/backups/cpanelbackup/accounts',
-		:restore_top_dir => '/backups/cpanelbackup',
-		:log_file_path => ENV['LOGFILE'] || '/var/log/cp-backup-runner.log',
-		:action        => 'backup',
-		:reconstruct_ip => true,
+    backup_dir:      '/backups/cpanelbackup/accounts',
+    restore_top_dir: '/backups/cpanelbackup',
+    log_file_path:   ENV['LOGFILE'] || '/var/log/cp-backup-runner.log',
+    action:          'backup',
+    reconstruct_ip:  true,
 }
 
 # -----------------------------------------------------------------------------
@@ -38,26 +38,35 @@ def parse_options
 			@options[:home_rsync] = v || File.join(@options[:restore_top_dir], 'home')
 		end
 
-		opts.on("--delete-source", "Delete source files after successful transfer") do
-			@options[:rm_source] = true
-		end
-
 		opts.on("--smart-id", "Use smart ID feature, where we set ownership properly on rsync'ed homedir after restoral") do
 			@options[:smart_id] = true
 		end
 
 		opts.on("--process-sql-grants", "Add SQL grants to final tar archive when backing up and exec SQL grants from it when restoring") do
 			@options[:process_sql_grants] = true
-		end
+    end
+
+    opts.on('--skip-ip', "Don't restore on original IP") do
+      @options[:reconstruct_ip] = false
+    end
+
+    opts.separator ''
+
+    opts.on("--delete-source", "Delete source files after successful transfer") do
+  			@options[:rm_source] = true
+    end
+
+    opts.separator ''
 
 		opts.on("--help") do
 			puts opts
 			exit 0
 		end
 
-		def opts.ver
-			CPanelBackup::Version.string
-		end
+		def opts.version
+			CPanelBackup::Version.string + "\n" + CPanelBackup::Version.authors.join(" + ")
+    end
+
 	end
 
 	optparse.parse!

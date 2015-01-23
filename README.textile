@@ -12,6 +12,7 @@ h3. Backing up stuff
 * Bacula runs a job.
 ** Bacula invokes pre-run hook on the client (@cpb_runner@)
 ** Bacula backups _/home_ & _/backups/cpanelbackup/accounts_ dirs
+** _/backups/cpanelbackup/accounts_ is deleted on successful job completion
 
 The hook is invoked with the following options:
 
@@ -25,7 +26,7 @@ h3. Restoring
 ** Backup files are placed into:
 *** CPanel backups (tar): _/backups/cpanelbackup/backups/cpanelbackup/accounts_
 *** Home dir backups (plain): _/backups/cpanelbackup/home_
-** User runs @cpb_runner@ script
+* User runs @cpb_runner@ script
 
 The script could be run as following:
 

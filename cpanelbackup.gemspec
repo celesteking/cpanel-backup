@@ -17,11 +17,11 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
   s.bindir = %w{sbin}
 
-  s.add_development_dependency 'ruby-debug'
-  s.add_development_dependency 'shoulda-context'
   s.add_development_dependency 'yard'
+  s.add_development_dependency 'rspec'
+  s.add_development_dependency 'shoulda-matchers'
 
-  s.add_runtime_dependency 'cpanel-helper', '~> 0.1.0'
+  s.add_runtime_dependency 'cpanel-helper', '~> 0.1'
   s.add_runtime_dependency 'activesupport', '>= 3.0.8'
 
 end
