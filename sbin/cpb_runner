@@ -32,7 +32,16 @@ def parse_options
 
 		opts.on("--users STRING", "Comma separated list of users to operate on") do |v|
 			@options[:users] = v.strip.split(/[,\s\t]+/)
-		end
+    end
+
+    opts.on('--skip-ip', "Don't restore on original IP") do
+      @options[:reconstruct_ip] = false
+    end
+
+    opts.on('--restore-existing', 'Restore to existing account') do
+      @options[:restore_to_existing] = true
+    end
+
 
 		opts.on("--home-rsync [FROM]", "Whether to rsync homedir from topdir FROM/") do |v|
 			@options[:home_rsync] = v || File.join(@options[:restore_top_dir], 'home')
@@ -126,12 +135,13 @@ def restore_em(cpbackup)
 	end
 
 	restore_opts = {
-			:reconstruct_ip            => @options[:reconstruct_ip],
-			:cpanel_dbflush_workaround => true,
-			:rsync_homedir             => @options[:home_rsync],
-			:rm_source                 => @options[:rm_source],
-			:smart_id                  => @options[:smart_id],
-			:exec_sql_grants           => @options[:process_sql_grants],
+      reconstruct_ip:            @options[:reconstruct_ip],
+      cpanel_dbflush_workaround: true,
+      rsync_homedir:             @options[:home_rsync],
+      rm_source:                 @options[:rm_source],
+      smart_id:                  @options[:smart_id],
+      exec_sql_grants:           @options[:process_sql_grants],
+      restore_to_existing:       @options[:restore_to_existing],
 	}
 	cpbackup.restore(restore_opts)
 end

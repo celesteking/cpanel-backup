@@ -94,6 +94,7 @@ class CPanelBackup
 	#              [TrueClass]: Whether to retrieve IP from the archive and use it in acc restoral,
 	#              [String]: Use specified IP when restoring account
 	# @option opts [Boolean]    :kill (true) Kill account before restoral
+	# @option opts [Boolean]    :restore_to_existing (true) Restore an existing account, don't kill it by default before doing that
 	# @option opts [String]     :backup_file (see code) Backup file path
 	# @option opts [Boolean]    :trick_homedir (false) Tar homedir files from _@backup_dir/home/user/_ into _@backup_dir/user/homedir.tar_, then append to :backup_file
 	# @option opts [Boolean]    :trick_homedir_rm (false) Delete homedir files after _tricking_
@@ -159,7 +160,7 @@ class CPanelBackup
 	def restore_account(user, opts)
 		default_opts = {
 				:backup_file => File.join(@backup_dir, "#{user}.tar"),
-				:kill => true,
+				:kill => !opts[:restore_to_existing],
 				:reconstruct_ip => true,
 				:trick_homedir => false,
 		}
@@ -193,6 +194,7 @@ class CPanelBackup
 		end
 
 		restore_add_args = "--ip=#{opts[:reconstruct_ip]}" if opts[:reconstruct_ip]
+    restore_add_args += ' --skipaccount ' if opts[:restore_to_existing]
 
 		invoke_and_log_cmd("#{@restoreacct_exe} #{restore_add_args} #{opts[:backup_file]}", 'restorepkg') do |output, stat|
 			if output.include?('Account Creation Status: failed')
