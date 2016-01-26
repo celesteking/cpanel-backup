@@ -33,7 +33,7 @@ class CPanelBackup
 
 		@pkgacct_exe = '/scripts/pkgacct'
 		@restoreacct_exe = '/scripts/restorepkg'
-		@killacct_exe = '/scripts/killacct'
+		@removeacct_exe = '/scripts/removeacct'
 
 		check_cpanel_tools_presence
 
@@ -229,7 +229,7 @@ class CPanelBackup
 
 	# @param [String] user
 	def kill_account(user)
-		invoke_and_log_cmd("#{@killacct_exe} --force --user=#{user}", 'killacct')
+		invoke_and_log_cmd("#{@removeacct_exe} --keepdns --force --user=#{user}", 'killacct')
 		killacct_success = $?.success?
 
 		FileUtils.rm_rf("/home/#{user}/")
@@ -294,7 +294,7 @@ class CPanelBackup
 	end
 
 	def check_cpanel_tools_presence
-		unless [@pkgacct_exe, @restoreacct_exe, @killacct_exe].all? {|exe| File.executable?(exe)}
+		unless [@pkgacct_exe, @restoreacct_exe, @removeacct_exe].all? {|exe| File.executable?(exe)}
 			raise(BackupError, "CPanel tools inaccessible")
 		end
 	end
