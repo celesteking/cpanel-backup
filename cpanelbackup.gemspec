@@ -11,11 +11,11 @@ Gem::Specification.new do |s|
   s.summary     = %q{CPanel Backup helper}
   s.description = %q{CPanel Backup helper that helps you backup & restore CPanel accounts}
 
-  s.files         = %w(README.textile Gemfile Rakefile) + Dir.glob('{bin,lib,spec}/**/*')
+  s.files         = %w(README.textile Gemfile Rakefile) + Dir.glob('{[s]bin,lib,spec}/**/*')
   s.test_files    = Dir.glob('{test,spec,features}/**/*')
-  s.executables   = Dir.glob('{sbin/*')
+  s.executables   = %w(cpb_runner)
   s.require_paths = %w(lib)
-  s.bindir        = %w{sbin}
+  s.bindir        = 'sbin'
 
   s.add_development_dependency 'yard'
 

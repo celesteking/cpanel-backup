@@ -48,6 +48,7 @@ Requires:	      rbenv-rubygem(cpanel-helper) >= 0.3.3
 
 Provides:       rbenv-rubygem(%{gemname}) = %{version}
 
+%if %{with rdoc}
 %description
 CPanel Backup helper that helps you backup & restore CPanel accounts.
 
@@ -59,10 +60,11 @@ Requires: %{name} = %{version}-%{release}
 
 %description doc
 This package contains documentation for %{name}.
+%endif
 
 %install
 rm -rf %{buildroot}
-%{_gem} install --local --install-dir %{buildroot}%{gemdir} \
+%{_gem} install --local --install-dir %{buildroot}%{gemdir} --bindir %{buildroot}%{gembindir} \
 %if %{with rdoc}
            --rdoc \
 %else
@@ -74,7 +76,7 @@ install -d %{buildroot}/%{gembindir}
 rm -rf %{buildroot}/%{geminstdir}/{etc,ext,install.rb,spec,*.gemspec,.gitignore,test}
 
 install -d %{buildroot}%{localbindir}
-mv %{buildroot}%{gemdir}/bin/cpb_runner %{buildroot}%{localbindir}/
+mv %{buildroot}%{gembindir}/* %{buildroot}%{localbindir}/
 
 %if %{without rdoc}
 rm -f %{buildroot}/%{geminstdir}/{Rakefile,Gemfile,*.gemspec}
@@ -96,12 +98,12 @@ rm -rf %{buildroot}
 %{gemdir}/specifications/%{gemname}-%{version}.gemspec
 %doc %{geminstdir}/README.textile
 
+%if %{with rdoc}
 %files doc
 %defattr(-, root, root, -)
 %{geminstdir}/Rakefile
 %{geminstdir}/Gemfile
-%{gemdir}/doc/%{gemname}-%{version}
-
+%endif
 
 %changelog
 * Wed Jul 13 2016 Yuri Arabadji <yuri@fused.internal> - 0.1.7-4
