@@ -1,8 +1,9 @@
-*.gem
 .bundle
 Gemfile.lock
-pkg/*
-doc/
-log/
+/pkg/
+/doc/
+/log/
+/*.spec
+/*.gem
 .idea
 .yardoc
