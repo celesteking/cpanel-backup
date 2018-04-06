@@ -28,7 +28,7 @@
 Summary:        CPanel Backup helper
 Name:           rbenv-rubygem-%{gemname}
 Version:        %{gem_version}
-Release:        5%{?dist}
+Release:        6%{?dist}
 Vendor:         %{?_host_vendor}
 License:        ASL 2.0
 Group:          System Environment/Base
@@ -47,6 +47,8 @@ Requires:	      rbenv-rubygem(activesupport) >= 3.2.22
 Requires:	      rbenv-rubygem(cpanel-helper) >= 0.3.3
 
 Provides:       rbenv-rubygem(%{gemname}) = %{version}
+
+Obsoletes:      rubygem-%{gemname}
 
 %if %{with rdoc}
 %description
@@ -106,6 +108,9 @@ rm -rf %{buildroot}
 %endif
 
 %changelog
+* Fri Apr 06 2018 Yuri Arabadji <yuri@fused.internal> - 0.1.7-5
+- obsolete rubygem-cpanelbackup
+
 * Wed Jul 13 2016 Yuri Arabadji <yuri@fused.internal> - 0.1.7-4
 - ruby ver bump
 
