@@ -3,10 +3,10 @@ class CPanelBackup
 	module Version
 		MAJOR = 0
 		MINOR = 1
-		RELEASE = 7
+		RELEASE = 8
 
 		AUTHORS = {
-				'Yuri Arabadji' => 2012..2015
+				'Yuri Arabadji' => [2012..2015, 2018]
 		}
 
 		def self.string

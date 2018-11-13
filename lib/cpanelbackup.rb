@@ -285,7 +285,7 @@ class CPanelBackup
 	# Get all existing CPanel accounts list
 	# @return [Array<String>]
 	def get_cpanel_account_list
-		CPanelHelper::Local.find_accounts_by_string('.*', 'regexp').keys
+		CPanelHelper::Local.find_accounts_by_string('.*', 'regexp').keys - %w(system default)
 	end
 
 	def trick_homedir_restore(opts)
