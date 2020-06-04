@@ -4,6 +4,8 @@
 
 %global gemname cpanel-backup
 
+%undefine __brp_mangle_shebangs
+
 %global localbindir %{_usr}/local/bin
 
 # our common rbenv stuff
