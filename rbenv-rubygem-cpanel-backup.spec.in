@@ -53,10 +53,10 @@ Provides:       rbenv-rubygem(%{gemname}) = %{version}
 
 Obsoletes:      rubygem-%{gemname}
 
-%if %{with rdoc}
 %description
 CPanel Backup helper that helps you backup & restore CPanel accounts.
 
+%if %{with rdoc}
 %package doc
 Summary: Documentation for %{name}
 Group: Documentation
