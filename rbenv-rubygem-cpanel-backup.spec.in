@@ -82,6 +82,7 @@ rm -rf %{buildroot}/%{geminstdir}/{etc,ext,install.rb,spec,*.gemspec,.gitignore,
 
 install -d %{buildroot}%{localbindir}
 mv %{buildroot}%{gembindir}/* %{buildroot}%{localbindir}/
+cp %{buildroot}/%{geminstdir}/sbin/snapvar.sh %{buildroot}%{localbindir}/
 
 %if %{without rdoc}
 rm -f %{buildroot}/%{geminstdir}/{Rakefile,Gemfile,*.gemspec}
@@ -99,6 +100,7 @@ rm -rf %{buildroot}
 %{geminstdir}/lib
 %{geminstdir}/sbin
 %attr(0750,root,root) %{localbindir}/cpb_runner
+%attr(0750,root,root) %{localbindir}/snapvar.sh
 %{gemdir}/cache/%{gemname}-%{version}.gem
 %{gemdir}/specifications/%{gemname}-%{version}.gemspec
 %doc %{geminstdir}/README.textile
