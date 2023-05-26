@@ -1,5 +1,6 @@
 #!/bin/bash
 
+export HOME=$( getent passwd "root" | cut -d: -f6 )
 snap_mnt=/mnt/var
 mysql_dir=/var/lib/mysql
 snap_size=5g
