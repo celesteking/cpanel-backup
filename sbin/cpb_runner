@@ -1,5 +1,6 @@
 #!/bin/env ruby
 
+$: << '/mnt/coding/cpb/lib'
 require 'rubygems'
 #require 'bundler/setup'
 
@@ -19,6 +20,7 @@ require 'cpanelhelper'
     log_file_path:   ENV['LOGFILE'] || '/var/log/cp-backup-runner.log',
     action:          'backup',
     reconstruct_ip:  true,
+    db_backup_type:		'schema'
 }
 
 # -----------------------------------------------------------------------------
@@ -42,7 +44,6 @@ def parse_options
       @options[:restore_to_existing] = true
     end
 
-
 		opts.on("--home-rsync [FROM]", "Whether to rsync homedir from topdir FROM/") do |v|
 			@options[:home_rsync] = v || File.join(@options[:restore_top_dir], 'home')
 		end
@@ -51,8 +52,8 @@ def parse_options
 			@options[:smart_id] = true
 		end
 
-		opts.on("--process-sql-grants", "Add SQL grants to final tar archive when backing up and exec SQL grants from it when restoring") do
-			@options[:process_sql_grants] = true
+		opts.on("--db-backup-type TYPE", "all | schema | name") do |type|
+			@options[:db_backup_type] = type
     end
 
     opts.on('--skip-ip', "Don't restore on original IP") do
@@ -100,7 +101,7 @@ end
 def back_em_up(cpbackup)
 	backups =
 		begin
-			cpbackup.backup(:append_sql_grants => @options[:process_sql_grants])
+			cpbackup.backup(@options)
 		rescue CPanelBackup::BackupError => exc
 			@log.error "Error while backing up: #{exc.message}. Trying to pick up what's been already done."
 			exc.processed
@@ -124,6 +125,7 @@ def restore_em(cpbackup)
 	cpbackup.check_dir_access(backup_dir, true) # we'll be moving tars to this dir
 
 	begin
+		@log.debug "About to: mv '#{restore_backup_dir}/*.tar'  #{backup_dir} ; rm -rf #{restore_backup_dir} ;"
 		FileUtils.mv(Dir.glob("#{restore_backup_dir}/*.tar"), backup_dir, :secure => true)
 		FileUtils.rm_rf(restore_backup_dir, :secure => true)
 	rescue SystemCallError => exc
@@ -135,13 +137,13 @@ def restore_em(cpbackup)
 	end
 
 	restore_opts = {
-      reconstruct_ip:            @options[:reconstruct_ip],
-      cpanel_dbflush_workaround: true,
-      rsync_homedir:             @options[:home_rsync],
-      rm_source:                 @options[:rm_source],
-      smart_id:                  @options[:smart_id],
-      exec_sql_grants:           @options[:process_sql_grants],
-      restore_to_existing:       @options[:restore_to_existing],
+			reconstruct_ip:      @options[:reconstruct_ip],
+			wait_for_userkill:   true,
+			rsync_homedir:       @options[:home_rsync],
+			rm_source:           @options[:rm_source],
+			smart_id:            @options[:smart_id],
+			exec_sql_grants:     false,
+			restore_to_existing: @options[:restore_to_existing],
 	}
 	cpbackup.restore(restore_opts)
 end

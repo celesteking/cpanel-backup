@@ -5,6 +5,7 @@ require 'active_support/core_ext/module/attribute_accessors'
 require 'active_support/core_ext/hash/reverse_merge'
 require 'fileutils'
 require 'etc'
+require 'json'
 
 require 'cpanelhelper'
 
@@ -45,7 +46,6 @@ class CPanelBackup
 	# @param [Hash] opts
 	# @option opts [Array] :exclude
 	# @option opts [Array] :include
-	# @option opts [Boolean] :append_sql_grants Incorporate mysql acess privs in mysql.sql file that goes into final tar
 	def backup(opts = {})
 		check_dir_access(backup_dir, true)
 
@@ -99,7 +99,7 @@ class CPanelBackup
 	# @option opts [Boolean]    :trick_homedir (false) Tar homedir files from _@backup_dir/home/user/_ into _@backup_dir/user/homedir.tar_, then append to :backup_file
 	# @option opts [Boolean]    :trick_homedir_rm (false) Delete homedir files after _tricking_
 	# @option opts [String]     :rsync_homedir (false) Rsync homedir files from this path to user's account
-	# @option opts [Boolean]    :cpanel_dbflush_workaround (false) Work around CPanel poo in *users.db*
+	# @option opts [Boolean]    :wait_for_userkill
 	# @option opts [Boolean]    :exec_sql_grants (false) Execute mysql grant permissions from mysql.sql file in tar archive
 	# @return [Array<String>] list of restored usernames
 	def restore(opts = {})
@@ -130,27 +130,8 @@ class CPanelBackup
 	def backup_account(user, opts = {})
 		tar_file = File.join(backup_dir, "#{user}.tar")
 
-		invoke_and_log_cmd("#{@pkgacct_exe} --backup  --skiphomedir --skipacctdb --nocompress #{user} #{backup_dir}", 'pkgacct')
+		invoke_and_log_cmd("#{@pkgacct_exe} --backup  --skiphomedir --dbbackup #{opts[:db_backup_type]} --nocompress #{user} #{backup_dir}", 'pkgacct')
 		raise(UserBackupError, "Failure while backing up #{user}") unless $?.success?
-
-		if opts[:append_sql_grants]
-			sql_data = cpanel_dump_sql_data(Etc.getpwnam(user).uid)
-			grant_text = sql_data['dumpsql']
-
-			temp_user_dir = File.join(backup_dir, user)
-			FileUtils.mkdir_p(temp_user_dir, :mode => 0700)
-
-			temp_mysql_file = "#{temp_user_dir}/mysql.sql"
-
-			File.open(temp_mysql_file, 'w', 0600) do |mfh|
-				mfh.puts '-- cPanel mysql backup'
-				mfh.puts grant_text
-			end
-
-			integrate_into_tar(tar_file, "#{user}/mysql.sql", backup_dir)
-
-			FileUtils.rm_rf(temp_user_dir)
-		end
 
 		"#{user}.tar"
 	end
@@ -177,8 +158,8 @@ class CPanelBackup
 			end
 		end
 
-		if opts[:cpanel_dbflush_workaround]
-			unless cpanel_dbflush_workaround(user).nil?
+		if opts[:wait_for_userkill]
+			unless wait_for_userkill(user).nil?
 				logger.info "Note: cpanel flush workaround didn't work, so restoral will probably fail."
 			end
 		end
@@ -197,7 +178,7 @@ class CPanelBackup
     restore_add_args += ' --skipaccount ' if opts[:restore_to_existing]
 
 		invoke_and_log_cmd("#{@restoreacct_exe} #{restore_add_args} #{opts[:backup_file]}", 'restorepkg') do |output, stat|
-			if output.include?('Account Creation Status: failed')
+			if output.include?('Account Restore Failed')
 				raise(UserRestoreError, "Failure restoring #{user}")
 			end
 		end
@@ -229,10 +210,12 @@ class CPanelBackup
 
 	# @param [String] user
 	def kill_account(user)
-		invoke_and_log_cmd("#{@removeacct_exe} --keepdns --force --user=#{user}", 'killacct')
-		killacct_success = $?.success?
+		if (killacct_success = (Etc.getpwnam(user) rescue false))
+			invoke_and_log_cmd("#{@removeacct_exe} --keepdns --force #{user}", 'killacct')
+			killacct_success = $?.success?
 
-		FileUtils.rm_rf("/home/#{user}/")
+			FileUtils.rm_rf("/home/#{user}/") # fixme: move out?
+		end
 
 		killacct_success
 	end
@@ -299,23 +282,13 @@ class CPanelBackup
 		end
 	end
 
-	# Wait until user.db gets rid of [user] records.
+	# Wait until user acct is killed.
 	# @return [NilClass] on success, otherwise a failure
-	def cpanel_dbflush_workaround(user)
-		cp_db_file = '/var/cpanel/databases/users.db'
+	def wait_for_userkill(user)
 		wait_time = 0
 		(1..8).inject do |acc, step| # Sleep logarithmically increasing number of seconds
 			%x{sync}
-			matched = File.open(cp_db_file, 'r') do |fh|
-				fh.fsync
-				fh.sync = true
-				sleep(0.1)
-				matched = fh.read.match(/^[\s]+#{user}:/)
-				fh.close
-				matched
-			end
-
-			unless matched
+			unless (JSON.load(%x{whmapi1 list_users})['data']['users'].include?(user) rescue nil)
 				logger.debug "{cpanel_poo1} Worked after waiting #{wait_time.round} secs."
 				break
 			end
