@@ -9,7 +9,7 @@ set -e
 
 src=$(findmnt -n --output=source -T ${mysql_dir})
 if [ "$2" = "fail_non_var" ]; then
-        lv=$(lvs  --noheadings -o lv_name ${src} | xargs)
+        lv=$(lvs --config 'log/prefix="" report/aligned=0' --noheadings -o lv_name ${src})
         if [ "$lv" != "var" ]; then
                 echo "error: $src: $lv is not 'var'!"
                 exit 1
