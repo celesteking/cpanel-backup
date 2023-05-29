@@ -8,6 +8,13 @@ snap_size=5g
 set -e
 
 src=$(findmnt -n --output=source -T ${mysql_dir})
+if [ "$2" = "fail_non_var" ]; then
+        lv=$(lvs  --noheadings -o lv_name ${src} | xargs)
+        if [ "$lv" != "var" ]; then
+                echo "error: $src: $lv is not 'var'!"
+                exit 1
+        fi
+fi
 
 function engage() {
 	(
