@@ -33,10 +33,8 @@ function release() {
     i=0
     while (( ++i <= 3 )); do
     	umount ${snap_mnt}
-    	if [ $? -ne 0 ]; then
-            lvremove -qy ${src}.snap
-            [ $? -eq 0 ] && break
-        fi
+        lvremove -qy ${src}.snap
+        [ $? -eq 0 ] && break
         sleep 5
     done
 
