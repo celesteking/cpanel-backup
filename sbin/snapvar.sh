@@ -29,8 +29,17 @@ function engage() {
 }
 
 function release() {
-	umount ${snap_mnt} || :
-	lvremove -qy ${src}.snap
+    set +e
+    i=0
+    while (( ++i <= 3 )); do
+    	umount ${snap_mnt}
+    	if [ $? -ne 0 ]; then
+            lvremove -qy ${src}.snap
+            [ $? -eq 0 ] && break
+        fi
+        sleep 5
+    done
+
 }
 
 case $1 in

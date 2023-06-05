@@ -3,7 +3,7 @@ class CPanelBackup
 	module Version
 		MAJOR = 0
 		MINOR = 2
-		RELEASE = 2
+		RELEASE = 3
 
 		AUTHORS = {
 				'Yuri Arabadji' => [2012..2015, 2018,2023]
