@@ -20,5 +20,5 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'yard'
 
   s.add_runtime_dependency 'cpanel-helper', '~> 0.1'
-  s.add_runtime_dependency 'activesupport', '~> 3.1'
+  s.add_runtime_dependency 'activesupport', '~> 8.0'
 end

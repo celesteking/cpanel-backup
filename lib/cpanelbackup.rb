@@ -4,6 +4,7 @@ require 'cpanelbackup/version'
 require 'active_support/core_ext/module/attribute_accessors'
 require 'active_support/core_ext/hash/reverse_merge'
 require 'fileutils'
+require 'open3'
 require 'etc'
 require 'json'
 
@@ -177,7 +178,7 @@ class CPanelBackup
 		restore_add_args = "--ip=#{opts[:reconstruct_ip]}" if opts[:reconstruct_ip]
     restore_add_args += ' --skipaccount ' if opts[:restore_to_existing]
 
-		invoke_and_log_cmd("#{@restoreacct_exe} #{restore_add_args} #{opts[:backup_file]}", 'restorepkg') do |output, stat|
+		invoke_and_log_cmd([@restoreacct_exe, restore_add_args, opts[:backup_file]], 'restorepkg') do |output, stat|
 			if output.include?('Account Restore Failed')
 				raise(UserRestoreError, "Failure restoring #{user}")
 			end
@@ -185,7 +186,7 @@ class CPanelBackup
 
 		if opts[:exec_sql_grants]
 			# Feed mysql.sql grant file from tar archive directly to mysql cli
-			feed_cmd = "tar --to-stdout -x -f  #{opts[:backup_file]} #{user}/mysql.sql | mysql -B -f"
+			feed_cmd = %W[sh -c] + ["tar --to-stdout -x -f  #{opts[:backup_file]} #{user}/mysql.sql | mysql -B -f"]
 			invoke_and_log_cmd(feed_cmd, 'sql_grant_exec')
 		end
 
@@ -211,7 +212,7 @@ class CPanelBackup
 	# @param [String] user
 	def kill_account(user)
 		if (killacct_success = (Etc.getpwnam(user) rescue false))
-			invoke_and_log_cmd("#{@removeacct_exe} --keepdns --force #{user}", 'killacct')
+			invoke_and_log_cmd(%W["#{@removeacct_exe} --keepdns --force #{user}], 'killacct')
 			killacct_success = $?.success?
 
 			FileUtils.rm_rf("/home/#{user}/") # fixme: move out?
@@ -335,29 +336,32 @@ class CPanelBackup
 		logger.debug "[CPB:restore] Attemping homedir permission fix." unless uid_correct and gid_correct
 
 		unless uid_correct
-			invoke_and_log_cmd("/usr/bin/find -P /home/#{user}/ -user #{homedir_stat.uid} -exec /bin/chown -P --no-dereference #{user} '{}' \\;", 'chown')
+			invoke_and_log_cmd(%W[/usr/bin/find -P /home/#{user}/ -user #{homedir_stat.uid} -exec /bin/chown -P --no-dereference #{user} '{}' \\;], 'chown')
 		end
 
 		unless gid_correct
-			invoke_and_log_cmd("/usr/bin/find -P /home/#{user}/ -group #{homedir_stat.gid} -exec /bin/chgrp -P --no-dereference #{user} '{}' \\;", 'chgrp')
+			invoke_and_log_cmd(%W[/usr/bin/find -P /home/#{user}/ -group #{homedir_stat.gid} -exec /bin/chgrp -P --no-dereference #{user} '{}' \\;], 'chgrp')
 		end
 
 	end
 
 	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 	def integrate_into_tar(tar_file, add_file, chdir = nil)
-		invoke_and_log_cmd("tar --append #{'-C ' + chdir if chdir} -pf #{tar_file} #{add_file}", 'tar_integrate')
+		invoke_and_log_cmd(%w[tar --append] + (chdir ? %W[-C, #{chdir}] : []) + %W[-pf #{tar_file} #{add_file}], 'tar_integrate')
 	end
 
 	def invoke_and_log_cmd(cmd, prefix = nil, &block)
-		logger.debug "{#{prefix}}  -- START: #{cmd} --"
-		output = %x{#{cmd}}
+		cmd_args = cmd.is_a?(Array) ? cmd : [cmd]
+		cmd_args_txt = cmd_args.join(' ')
+
+		logger.debug "{#{prefix}}  -- START: #{cmd_args_txt} --"
+		output, status = Open3.capture2e(*cmd_args)
 		log_lines(output, prefix)
-		logger.debug "{#{prefix}}  -- END:   #{cmd} --"
+		logger.debug "{#{prefix}}  -- END:   #{cmd_args_txt} --"
 
-		yield(output, $?) if block_given?
+		yield(output, status) if block_given?
 
-		$?.exitstatus
+		status.exitstatus
 	end
 
 	def log_lines(text, prefix = 'cpbck')

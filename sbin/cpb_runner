@@ -1,9 +1,5 @@
 #!/usr/bin/env ruby
 
-$: << '/mnt/coding/cpb/lib'
-require 'rubygems'
-#require 'bundler/setup'
-
 require 'active_support/core_ext/numeric/bytes'
 
 require 'optparse'
