@@ -231,10 +231,15 @@ class CPanelBackup
 		raise ArgumentError if src =~ %r{^[/\.]+$} or dst =~ %r{^[/\.]+$}
 
 		logger.debug "{rsync} Sync'ing #{src} -> #{dst} #{'with source deletion afterwards' if opts[:rm_source]}"
-		output = %x{rsync -rlAXtgo #{'--remove-source-files' if opts[:rm_source]} #{src} #{dst}}
+		rsync_args = ['rsync', '-rlAXtgo']
+		rsync_args << '--remove-source-files' if opts[:rm_source]
+		rsync_args << src
+		rsync_args << dst
+
+		output, status = Open3.capture2e(*rsync_args)
 		log_lines(output, 'rsync') unless output.strip.empty?
 
-		raise BackupError unless $?.success?
+		raise BackupError unless status.success?
 
 		if opts[:rm_source]
 			FileUtils.rm_rf(src, :secure => true)
